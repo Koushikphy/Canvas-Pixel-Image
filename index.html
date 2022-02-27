@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+        }
+
+        canvas {
+            position: absolute;
+            background: black;
+            width: 100%;
+            height: 100vh;
+            top: 0;
+            touch-action: none;
+            left: 0;
+        }
+
+        #fileInput {
+            position: absolute;
+            z-index: 999;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="canvas"></canvas>
+    <input type="file" name="" id="fileInput" onchange="readFile(event)">
+
+
+    <script>
+        var canvas = document.getElementById("canvas");
+        var ctx = canvas.getContext("2d");
+        var height, width, startHeight = 0, startWidth = 0;
+        var particleArray = [];
+        const nParticle = 5000;
+        var imageArr;
+
+        window.onload = () => {
+            canvas.height = window.innerHeight / 1.5
+            canvas.width = window.innerWidth / 1.5
+        }
+
+        const getRandom = (min, max) => min + Math.random() * (max - min)
+
+        class Particle {
+            constructor() {
+                this.x = getRandom(startWidth, width + startWidth)
+                this.y = startHeight
+                this.velocity = getRandom(0, 0.5)
+                this.size = getRandom(1, 2.5)
+                this.offset = 0
+            }
+
+            update() {
+                var tx = parseInt(this.x - startWidth)
+                var ty = parseInt(this.y - startHeight)
+                this.offset = imageArr[ty][tx][1]
+
+                this.y += this.velocity + (255 - this.offset) / 100
+
+                if (this.y >= height) {
+                    this.y = startHeight
+                    this.x = getRandom(startWidth, width + startWidth)
+                }
+
+                ctx.beginPath()
+                ctx.fillStyle = imageArr[ty][tx][0]
+                ctx.arc(this.x, this.y, this.size, 0, 2 * Math.PI)
+                ctx.fill()
+            }
+        }
+
+
+        function animate() {
+            // ctx.drawImage(myImage, startWidth, startHeight, width, height);
+            max = 0
+            ctx.globalAlpha = 0.05
+            ctx.fillStyle = 'rgb(0,0,0)'
+            // ctx.globalAlpha = 0.2
+            ctx.fillRect(startWidth, startHeight, width, height);
+
+            for (let p of particleArray) {
+                p.update()
+                // ctx.globalAlpha = p.cc * 0.1
+            }
+            // console.log(max)
+            requestAnimationFrame(animate)
+        }
+
+        var max = 0
+        var contrast = 0.9
+        contrast *= 2.55; // or *= 255 / 100; scale integer percent to full range
+        var factor = (255 + contrast) / (255.01 - contrast);  //add .1 to avoid /0 error
+
+        function relativeContrast(r, g, b, a) {
+            x = Math.sqrt(r*r*0.299 + g*g*0.587 + b*b*0.114)
+            // x = (r + g + b) / 3
+            // r = factor * (r-128)*128
+            // g = factor * (g-128)*128
+            // b = factor * (b-128)*128
+            // if(x>max) max=x
+            return [`rgb(${r},${g},${b})`, x]
+        }
+
+
+        function readFile(ev) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const reader = new FileReader();
+            let files = ev.target.files
+            if (files.length) reader.readAsDataURL(files[0])
+
+            reader.onload = function (e) {
+                const myImage = new Image();
+                myImage.src = e.target.result
+                myImage.onload = () => {
+                    height = myImage.height
+                    width = myImage.width
+                    // console.log('width', width, canvas.width)
+                    // console.log('height', height, canvas.height)
+                    if (width > canvas.width && height > canvas.height) {
+                        let canvasRatio = canvas.width / canvas.height
+                        let imRation = width / height;
+                        if (height > width) {
+                            height = canvas.height
+                            width = imRation * height
+                        } else {
+                            width = canvas.width
+                            height = width / imRation
+                        }
+                    }
+
+                    if (width > canvas.width) {
+                        let myImageratio = height / width
+                        width = canvas.width
+                        height = width * myImageratio
+                    }
+                    if (height > canvas.height) {
+                        let myImageratio = width / height
+                        height = canvas.height
+                        width = height * myImageratio
+                    }
+
+                    if (height < canvas.height) startHeight = (canvas.height - height) / 2.0
+                    if (width < canvas.width) startWidth = (canvas.width - width) / 2.0
+                    height = parseInt(height)
+                    width = parseInt(width)
+
+
+                    console.log('current', height, width)
+                    ctx.drawImage(myImage, startWidth, startHeight, width, height);
+                    const pixel = ctx.getImageData(startWidth, startHeight, width, height).data
+                    ctx.clearRect(0, 0, canvas.width, canvas.height)
+                    // ctx.putImageData(pixel, startWidth, startHeight)
+                    imageArr = new Array(height).fill(null).map((_, i) => new Array(width).fill(null).map((_, j) => relativeContrast(...pixel.subarray(4 * (i * width + j), 4 * (i * width + j + 1)))))
+                    // console.log('done', height, width)
+
+                    particleArray = new Array(nParticle).fill(null).map(_=>new Particle())
+                    animate()
+                }
+            };
+        }
+
+
+    </script>
+</body>
+
+</html>
